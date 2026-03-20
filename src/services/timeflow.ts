@@ -1,0 +1,502 @@
+import {
+  currentUser as mockCurrentUser,
+  projects as mockProjects,
+  weekData as mockWeekData,
+  teamMembers as mockTeamMembers,
+  deadline as mockDeadline,
+  catchupDays as mockCatchupDays,
+  initialEntries as mockEntries,
+  initialNotifications as mockNotifications,
+  initialApprovals as mockApprovals,
+} from "@/data/mockData";
+import { hasSupabaseConfig, supabase } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
+import type {
+  AppNotification,
+  CatchupDay,
+  CurrentUser,
+  Deadline,
+  TeamMember,
+  TimeEntry,
+  TimesheetApproval,
+  WeekData,
+} from "@/types/timeflow";
+
+const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+const PROFILE_STORAGE_KEY = "timeflow-profile";
+
+const getProfileStorageKey = (authUserId?: string | null) =>
+  authUserId ? `${PROFILE_STORAGE_KEY}:${authUserId}` : PROFILE_STORAGE_KEY;
+
+const useFallback = <T,>(fallback: T): T => clone(fallback);
+
+const withFallback = async <T,>(
+  loader: () => Promise<T>,
+  fallback: T
+): Promise<T> => {
+  if (!hasSupabaseConfig || !supabase) {
+    return useFallback(fallback);
+  }
+
+  try {
+    return await loader();
+  } catch (error) {
+    console.warn("Supabase request failed, using mock fallback.", error);
+    return useFallback(fallback);
+  }
+};
+
+const mapCurrentUser = (row: any): CurrentUser => ({
+  name: row.name,
+  role: row.role,
+  email: row.email,
+  location: row.location,
+  initials: row.initials,
+});
+
+const buildInitials = (name: string, fallback = mockCurrentUser.initials) => {
+  const initials = name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+
+  return initials || fallback;
+};
+
+const getNameFromAuthUser = (user: User) => {
+  const metadataName =
+    typeof user.user_metadata?.full_name === "string"
+      ? user.user_metadata.full_name
+      : typeof user.user_metadata?.name === "string"
+        ? user.user_metadata.name
+        : null;
+
+  if (metadataName?.trim()) {
+    return metadataName.trim();
+  }
+
+  if (user.email) {
+    return user.email.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  return mockCurrentUser.name;
+};
+
+const getStoredCurrentUser = (authUserId?: string | null): CurrentUser | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(getProfileStorageKey(authUserId));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const persistCurrentUser = (user: CurrentUser, authUserId?: string | null) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(getProfileStorageKey(authUserId), JSON.stringify(user));
+};
+
+const mapTimeEntry = (row: any): TimeEntry => ({
+  id: Number(row.id),
+  project: row.project,
+  task: row.task,
+  timeRange: row.time_range ?? "",
+  duration: row.duration,
+  confidence: row.confidence ?? "high",
+  source: row.source ?? "Manual",
+  confirmed: Boolean(row.confirmed),
+  aiReason: row.ai_reason ?? undefined,
+  reviewStatus: row.review_status ?? undefined,
+});
+
+const mapNotification = (row: any): AppNotification => ({
+  id: Number(row.id),
+  unread: Boolean(row.unread),
+  type: row.type,
+  icon: row.icon,
+  iconBg: row.icon_bg,
+  dotColor: row.dot_color,
+  title: row.title,
+  body: row.body,
+  time: row.time_label,
+  date: row.date_label,
+  action: row.action_label && row.action_route
+    ? { label: row.action_label, route: row.action_route }
+    : null,
+});
+
+export const getCurrentUser = async (): Promise<CurrentUser> =>
+  withFallback(async () => {
+    const { data, error } = await supabase!
+      .from("profiles")
+      .select("name, role, email, location, initials")
+      .order("name", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    const user = data ? mapCurrentUser(data) : getStoredCurrentUser() ?? mockCurrentUser;
+    persistCurrentUser(user);
+    return user;
+  }, getStoredCurrentUser() ?? mockCurrentUser);
+
+export const ensureCurrentUserProfile = async (authUser: User): Promise<CurrentUser> => {
+  const derivedName = getNameFromAuthUser(authUser);
+  const seededProfile: CurrentUser = {
+    name: derivedName,
+    role: "",
+    email: authUser.email ?? mockCurrentUser.email,
+    location: "",
+    initials: buildInitials(derivedName),
+  };
+
+  if (!hasSupabaseConfig || !supabase) {
+    persistCurrentUser(seededProfile, authUser.id);
+    return seededProfile;
+  }
+
+  const { data: existingProfile, error: existingProfileError } = await supabase
+    .from("profiles")
+    .select("name, role, email, location, initials")
+    .eq("id", authUser.id)
+    .maybeSingle();
+
+  if (existingProfileError) {
+    throw existingProfileError;
+  }
+
+  if (existingProfile) {
+    const nextProfile = mapCurrentUser(existingProfile);
+    persistCurrentUser(nextProfile, authUser.id);
+    return nextProfile;
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .insert({
+      id: authUser.id,
+      name: seededProfile.name,
+      role: seededProfile.role,
+      email: seededProfile.email,
+      location: seededProfile.location,
+      initials: seededProfile.initials,
+    })
+    .select("name, role, email, location, initials")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  const nextProfile = mapCurrentUser(data);
+  persistCurrentUser(nextProfile, authUser.id);
+  return nextProfile;
+};
+
+export const updateCurrentUser = async (
+  updates: Pick<CurrentUser, "name" | "role" | "email" | "location">,
+  authUserId?: string | null
+): Promise<CurrentUser> => {
+  const nextUser: CurrentUser = {
+    ...(getStoredCurrentUser(authUserId) ?? mockCurrentUser),
+    ...updates,
+  };
+
+  if (!hasSupabaseConfig || !supabase) {
+    persistCurrentUser(nextUser, authUserId);
+    return nextUser;
+  }
+
+  const profileQuery = supabase.from("profiles").select("id, role, initials");
+  const { data: existingUser, error: existingUserError } = await (authUserId
+    ? profileQuery.eq("id", authUserId).maybeSingle()
+    : profileQuery.order("name", { ascending: true }).limit(1).maybeSingle());
+
+  if (existingUserError) throw existingUserError;
+
+  const initials = buildInitials(updates.name, existingUser?.initials || mockCurrentUser.initials);
+
+  const payload = {
+    id: authUserId ?? existingUser?.id,
+    name: updates.name,
+    email: updates.email,
+    location: updates.location,
+    role: updates.role || existingUser?.role || mockCurrentUser.role,
+    initials,
+  };
+
+  const query = existingUser?.id
+    ? supabase
+        .from("profiles")
+        .update(payload)
+        .eq("id", existingUser.id)
+    : supabase
+        .from("profiles")
+        .insert({
+          id: payload.id,
+          name: payload.name,
+          role: payload.role,
+          email: payload.email,
+          location: payload.location,
+          initials: payload.initials,
+        });
+
+  const { data, error } = await query
+    .select("name, role, email, location, initials")
+    .single();
+
+  if (error) throw error;
+  const savedUser = mapCurrentUser(data);
+  persistCurrentUser(savedUser, authUserId);
+  return savedUser;
+};
+
+export const isCurrentUserProfileComplete = (user: CurrentUser) =>
+  Boolean(user.name.trim() && user.email.trim() && user.role.trim() && user.location.trim());
+
+export const getCurrentUserByAuth = async (authUserId?: string | null): Promise<CurrentUser> =>
+  withFallback(async () => {
+    if (!authUserId) {
+      const storedUser = getStoredCurrentUser();
+      if (storedUser) {
+        return storedUser;
+      }
+
+      return mockCurrentUser;
+    }
+
+    const { data, error } = await supabase!
+      .from("profiles")
+      .select("name, role, email, location, initials")
+      .eq("id", authUserId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    const user = data ? mapCurrentUser(data) : getStoredCurrentUser(authUserId) ?? mockCurrentUser;
+    persistCurrentUser(user, authUserId);
+    return user;
+  }, getStoredCurrentUser(authUserId) ?? mockCurrentUser);
+
+export const getProjects = async (): Promise<string[]> =>
+  withFallback(async () => {
+    const { data, error } = await supabase!
+      .from("projects")
+      .select("name")
+      .order("display_order", { ascending: true })
+      .order("name", { ascending: true });
+
+    if (error) throw error;
+    return data.map((project) => project.name);
+  }, mockProjects);
+
+export const getWeekData = async (): Promise<WeekData> =>
+  withFallback(async () => {
+    const [{ data: summary, error: summaryError }, { data: days, error: daysError }] =
+      await Promise.all([
+        supabase!
+          .from("weekly_summary")
+          .select("week_number, label, range_label, expected_hours")
+          .limit(1)
+          .single(),
+        supabase!
+          .from("weekly_days")
+          .select("day_label, hours, status, sort_order")
+          .order("sort_order", { ascending: true }),
+      ]);
+
+    if (summaryError) throw summaryError;
+    if (daysError) throw daysError;
+
+    return {
+      weekNumber: summary.week_number,
+      label: summary.label,
+      rangeLabel: summary.range_label,
+      expectedHours: summary.expected_hours,
+      days: days.map((day) => ({
+        day: day.day_label,
+        hours: Number(day.hours),
+        status: day.status,
+      })),
+    };
+  }, mockWeekData);
+
+export const getTeamMembers = async (): Promise<TeamMember[]> =>
+  withFallback(async () => {
+    const { data, error } = await supabase!
+      .from("team_members")
+      .select("name, initials, days")
+      .order("name", { ascending: true });
+
+    if (error) throw error;
+
+    return data.map((member) => ({
+      name: member.name,
+      initials: member.initials,
+      days: Array.isArray(member.days) ? member.days.map(Number) : [],
+    }));
+  }, mockTeamMembers);
+
+export const getDeadline = async (): Promise<Deadline> =>
+  withFallback(async () => {
+    const { data, error } = await supabase!
+      .from("deadlines")
+      .select("date_label, days_left, week_label, late_count")
+      .limit(1)
+      .single();
+
+    if (error) throw error;
+
+    return {
+      date: data.date_label,
+      daysLeft: Number(data.days_left),
+      weekLabel: data.week_label ?? "Week 10",
+      lateCount: Number(data.late_count ?? 0),
+    };
+  }, mockDeadline);
+
+export const getCatchupDays = async (): Promise<CatchupDay[]> =>
+  withFallback(async () => {
+    const [{ data: days, error: daysError }, { data: entries, error: entriesError }] =
+      await Promise.all([
+        supabase!
+          .from("catchup_days")
+          .select("id, day_label, hours_label, entries_count, sort_order")
+          .order("sort_order", { ascending: true }),
+        supabase!
+          .from("catchup_entries")
+          .select("id, catchup_day_id, project, task, duration, confidence, sort_order")
+          .order("sort_order", { ascending: true }),
+      ]);
+
+    if (daysError) throw daysError;
+    if (entriesError) throw entriesError;
+
+    return days.map((day) => ({
+      day: day.day_label,
+      hours: day.hours_label,
+      entriesCount: Number(day.entries_count),
+      entries: entries
+        .filter((entry) => entry.catchup_day_id === day.id)
+        .map((entry) => ({
+          id: Number(entry.id),
+          project: entry.project,
+          task: entry.task,
+          duration: entry.duration,
+          confidence: entry.confidence,
+        })),
+    }));
+  }, mockCatchupDays);
+
+export const getTimeEntries = async (): Promise<TimeEntry[]> =>
+  withFallback(async () => {
+    const { data, error } = await supabase!
+      .from("time_entries")
+      .select("id, project, task, time_range, duration, confidence, source, confirmed")
+      .order("id", { ascending: true });
+
+    if (error) throw error;
+    return data.map(mapTimeEntry);
+  }, mockEntries);
+
+export const saveTimeEntry = async (entry: Omit<TimeEntry, "id"> & { id?: number }): Promise<TimeEntry> => {
+  if (!hasSupabaseConfig || !supabase) {
+    return {
+      ...entry,
+      id: entry.id ?? Date.now(),
+    } as TimeEntry;
+  }
+
+  const payload = {
+    id: entry.id,
+    project: entry.project,
+    task: entry.task,
+    time_range: entry.timeRange,
+    duration: entry.duration,
+    confidence: entry.confidence,
+    source: entry.source,
+    confirmed: entry.confirmed,
+    ai_reason: entry.aiReason,
+    review_status: entry.reviewStatus,
+  };
+
+  const { data, error } = await supabase
+    .from("time_entries")
+    .upsert(payload)
+    .select("id, project, task, time_range, duration, confidence, source, confirmed, ai_reason, review_status")
+    .single();
+
+  if (error) throw error;
+  return mapTimeEntry(data);
+};
+
+export const deleteTimeEntry = async (id: number): Promise<void> => {
+  if (!hasSupabaseConfig || !supabase) {
+    return;
+  }
+
+  const { error } = await supabase.from("time_entries").delete().eq("id", id);
+  if (error) throw error;
+};
+
+export const getNotifications = async (): Promise<AppNotification[]> =>
+  withFallback(async () => {
+    const { data, error } = await supabase!
+      .from("notifications")
+      .select("id, unread, type, icon, icon_bg, dot_color, title, body, time_label, date_label, action_label, action_route")
+      .order("id", { ascending: true });
+
+    if (error) throw error;
+    return data.map(mapNotification);
+  }, mockNotifications);
+
+export const markNotificationAsRead = async (id: number): Promise<void> => {
+  if (!hasSupabaseConfig || !supabase) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("notifications")
+    .update({ unread: false })
+    .eq("id", id);
+
+  if (error) throw error;
+};
+
+export const markAllNotificationsAsRead = async (): Promise<void> => {
+  if (!hasSupabaseConfig || !supabase) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("notifications")
+    .update({ unread: false })
+    .eq("unread", true);
+
+  if (error) throw error;
+};
+
+export const getTimesheetApprovals = async (): Promise<TimesheetApproval[]> =>
+  withFallback(async () => {
+    const { data, error } = await supabase!
+      .from("timesheet_approvals")
+      .select("id, name, initials, week_label, total_hours, entries_count, submitted_at_label, status")
+      .order("id", { ascending: true });
+
+    if (error) throw error;
+
+    return data.map((item) => ({
+      id: Number(item.id),
+      name: item.name,
+      initials: item.initials,
+      week: item.week_label,
+      totalHours: Number(item.total_hours),
+      entries: Number(item.entries_count),
+      submittedAt: item.submitted_at_label,
+      status: item.status,
+    }));
+  }, mockApprovals);

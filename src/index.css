@@ -1,0 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-body: 'Urbanist', system-ui, -apple-system, sans-serif;
+
+    --background: 220 14% 97%;
+    --foreground: 220 30% 9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 30% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 30% 9%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 30% 9%;
+
+    --muted: 220 9% 46%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 234 89% 74%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 213 97% 78%;
+
+    --radius: 16px;
+
+    /* Timeflow custom tokens */
+    --tf-bg: 220 14% 97%;
+    --tf-ink: 220 30% 9%;
+    --tf-muted: 220 9% 46%;
+    --tf-border: 220 13% 91%;
+    --tf-surface: 220 14% 96%;
+    --tf-accent: 234 89% 74%;
+    --tf-accent-hover: 234 89% 66%;
+    --tf-blue: 217 91% 60%;
+    --tf-blue-hover: 217 91% 52%;
+    --tf-blue-light: 217 91% 97%;
+    --tf-teal: 168 72% 37%;
+    --tf-green: 142 71% 45%;
+    --tf-yellow: 43 96% 56%;
+    --tf-orange: 27 96% 61%;
+    --tf-red: 0 72% 51%;
+    --tf-purple: 234 89% 74%;
+    --tf-topbar: 0 0% 100%;
+
+    --tf-card-bg: 0 0% 100%;
+    --tf-card-border: 220 13% 91%;
+
+    --sidebar-background: 220 14% 97%;
+    --sidebar-foreground: 220 30% 9%;
+    --sidebar-primary: 234 89% 74%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 220 30% 9%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 234 89% 74%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-body);
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  .font-heading {
+    font-family: var(--font-body);
+    letter-spacing: -0.02em;
+  }
+  .font-body {
+    font-family: var(--font-body);
+  }
+  .font-mono-dm {
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+  }
+
+  /* Typography system */
+  .type-hero {
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+  .type-metric {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .type-body {
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+  .type-secondary {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.4;
+    color: hsl(var(--muted));
+  }
+  .type-label {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: hsl(220 9% 64%);
+  }
+  .type-kpi-number {
+    font-size: 24px;
+    font-weight: 600;
+  }
+  .type-kpi-label {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: hsl(220 9% 64%);
+  }
+  .type-button {
+    font-size: 14px;
+    font-weight: 500;
+  }
+}
+
+@keyframes wave {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
