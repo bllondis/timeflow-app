@@ -85,3 +85,9 @@ export interface TimesheetApproval {
   submittedAt: string;
   status: "pending" | "approved" | "revision";
 }
+
+export interface IntegrationConnection {
+  provider: string;
+  connected: boolean;
+  expiresAt: string | null;
+}

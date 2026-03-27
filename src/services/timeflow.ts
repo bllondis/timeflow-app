@@ -16,6 +16,7 @@ import type {
   CatchupDay,
   CurrentUser,
   Deadline,
+  IntegrationConnection,
   TeamMember,
   TimeEntry,
   TimesheetApproval,
@@ -24,6 +25,8 @@ import type {
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const PROFILE_STORAGE_KEY = "timeflow-profile";
+const GOOGLE_CALENDAR_PROVIDER = "google";
+const GOOGLE_CALENDAR_REDIRECT_URI = "https://timeflow-assistant-main.vercel.app/auth/callback/google";
 
 const getProfileStorageKey = (authUserId?: string | null) =>
   authUserId ? `${PROFILE_STORAGE_KEY}:${authUserId}` : PROFILE_STORAGE_KEY;
@@ -128,6 +131,22 @@ const mapNotification = (row: any): AppNotification => ({
     ? { label: row.action_label, route: row.action_route }
     : null,
 });
+
+const mapIntegrationConnection = (row: any): IntegrationConnection => ({
+  provider: row.provider,
+  connected: true,
+  expiresAt: row.expires_at ?? null,
+});
+
+const getGoogleCalendarRedirectUrl = () => {
+  if (typeof window === "undefined") {
+    return GOOGLE_CALENDAR_REDIRECT_URI;
+  }
+
+  return window.location.hostname === "localhost"
+    ? `${window.location.origin}/auth/callback/google`
+    : GOOGLE_CALENDAR_REDIRECT_URI;
+};
 
 export const getCurrentUser = async (): Promise<CurrentUser> =>
   withFallback(async () => {
@@ -257,6 +276,147 @@ export const updateCurrentUser = async (
 
 export const isCurrentUserProfileComplete = (user: CurrentUser) =>
   Boolean(user.name.trim() && user.email.trim() && user.role.trim() && user.location.trim());
+
+export const getGoogleCalendarIntegration = async (
+  authUserId?: string | null
+): Promise<IntegrationConnection | null> =>
+  withFallback(async () => {
+    if (!authUserId) {
+      return null;
+    }
+
+    const { data, error } = await supabase!
+      .from("integrations")
+      .select("provider, expires_at")
+      .eq("user_id", authUserId)
+      .eq("provider", GOOGLE_CALENDAR_PROVIDER)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return data ? mapIntegrationConnection(data) : null;
+  }, null);
+
+export const connectGoogleCalendar = async () => {
+  if (!supabase) {
+    throw new Error("Supabase is not configured");
+  }
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: getGoogleCalendarRedirectUrl(),
+      scopes: "openid email profile https://www.googleapis.com/auth/calendar.readonly",
+      queryParams: {
+        access_type: "offline",
+        prompt: "consent",
+        include_granted_scopes: "true",
+      },
+    },
+  });
+
+  if (error) {
+    throw error;
+  }
+};
+
+export const disconnectGoogleCalendar = async (authUserId?: string | null) => {
+  if (!authUserId) {
+    return;
+  }
+
+  if (!hasSupabaseConfig || !supabase) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("integrations")
+    .delete()
+    .eq("user_id", authUserId)
+    .eq("provider", GOOGLE_CALENDAR_PROVIDER);
+
+  if (error) {
+    throw error;
+  }
+};
+
+export const saveGoogleCalendarTokens = async (params: {
+  authUserId: string;
+  accessToken: string;
+  refreshToken?: string | null;
+  expiresAt?: string | null;
+}) => {
+  if (!hasSupabaseConfig || !supabase) {
+    throw new Error("Supabase is not configured");
+  }
+
+  const { authUserId, accessToken, refreshToken, expiresAt } = params;
+
+  const { error } = await supabase.from("integrations").upsert(
+    {
+      user_id: authUserId,
+      provider: GOOGLE_CALENDAR_PROVIDER,
+      access_token: accessToken,
+      refresh_token: refreshToken ?? null,
+      expires_at: expiresAt ?? null,
+    },
+    {
+      onConflict: "user_id,provider",
+    }
+  );
+
+  if (error) {
+    throw error;
+  }
+};
+
+export const completeGoogleCalendarOAuth = async () => {
+  if (!supabase) {
+    throw new Error("Supabase is not configured");
+  }
+
+  if (typeof window === "undefined") {
+    throw new Error("OAuth callback is only available in the browser");
+  }
+
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get("code");
+
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      throw error;
+    }
+  }
+
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (sessionError) {
+    throw sessionError;
+  }
+
+  if (!session?.user) {
+    throw new Error("No authenticated user found after Google Calendar connect.");
+  }
+
+  if (!session.provider_token) {
+    throw new Error("Google access token is missing. Check the Google provider scopes in Supabase.");
+  }
+
+  await saveGoogleCalendarTokens({
+    authUserId: session.user.id,
+    accessToken: session.provider_token,
+    refreshToken: session.provider_refresh_token,
+    expiresAt: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
+  });
+
+  return session.user.id;
+};
 
 export const getCurrentUserByAuth = async (authUserId?: string | null): Promise<CurrentUser> =>
   withFallback(async () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { X, Plus, Settings as SettingsIcon, Unplug } from 'lucide-react';
-import { updateCurrentUser } from '@/services/timeflow';
+import {
+  connectGoogleCalendar,
+  disconnectGoogleCalendar,
+  getGoogleCalendarIntegration,
+  updateCurrentUser,
+} from '@/services/timeflow';
 
 interface Integration {
   id: string;
@@ -29,7 +34,7 @@ interface CollectionToggle {
 }
 
 const defaultIntegrations: Integration[] = [
-  { id: 'gcal', name: 'Google Calendar', icon: 'Cal', iconBg: 'bg-[hsl(217_89%_51%)]', description: 'Event titles · duration · attendees count', connected: true, account: 'olena@company.com', badges: [{ label: 'Event titles', allowed: true }, { label: 'Duration', allowed: true }, { label: 'Event content', allowed: false }, { label: 'Attendee names', allowed: false }] },
+  { id: 'gcal', name: 'Google Calendar', icon: 'Cal', iconBg: 'bg-[hsl(217_89%_51%)]', description: 'Event titles · duration · attendees count', connected: false, badges: [{ label: 'Event titles', allowed: true }, { label: 'Duration', allowed: true }, { label: 'Event content', allowed: false }, { label: 'Attendee names', allowed: false }] },
   { id: 'figma', name: 'Figma', icon: 'Fig', iconBg: 'bg-[hsl(0_0%_12%)]', description: 'Active files · session duration · project names', connected: true, account: '@olena_kovalenko', badges: [{ label: 'File names', allowed: true }, { label: 'Session time', allowed: true }, { label: 'File content', allowed: false }, { label: 'Screenshots', allowed: false }] },
   { id: 'jira', name: 'Jira', icon: 'Jira', iconBg: 'bg-[hsl(214_100%_40%)]', description: 'Tickets viewed · comments added · status changes', connected: true, account: 'olena@company.com', badges: [{ label: 'Ticket IDs', allowed: true }, { label: 'Time on ticket', allowed: true }, { label: 'Ticket content', allowed: false }, { label: 'Comments text', allowed: false }] },
   { id: 'github', name: 'GitHub', icon: 'GH', iconBg: 'bg-[hsl(210_12%_16%)]', description: 'Commits · PRs · code review activity', connected: false },
@@ -47,21 +52,105 @@ const defaultCollectionToggles: CollectionToggle[] = [
 ];
 
 export const SettingsIntegrations = () => {
-  const [integrations, setIntegrations] = useState(defaultIntegrations);
+  const { user } = useAuthContext();
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(true);
+  const [isGoogleConnecting, setIsGoogleConnecting] = useState(false);
   const { toast } = useToast();
 
-  const handleConnect = (id: string) => {
-    setIntegrations(prev => prev.map(i => i.id === id ? { ...i, connected: true, account: 'olena@company.com' } : i));
+  useEffect(() => {
+    let active = true;
+
+    const loadGoogleStatus = async () => {
+      if (!user?.id) {
+        if (active) {
+          setGoogleConnected(false);
+          setIsGoogleLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const integration = await getGoogleCalendarIntegration(user.id);
+        if (active) {
+          setGoogleConnected(Boolean(integration?.connected));
+        }
+      } catch (error) {
+        console.warn("Failed to load Google Calendar integration state.", error);
+        if (active) {
+          setGoogleConnected(false);
+        }
+      } finally {
+        if (active) {
+          setIsGoogleLoading(false);
+        }
+      }
+    };
+
+    void loadGoogleStatus();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+
+  const integrations = useMemo(
+    () =>
+      defaultIntegrations.map((integration) =>
+        integration.id === "gcal"
+          ? {
+              ...integration,
+              connected: googleConnected,
+            }
+          : integration
+      ),
+    [googleConnected]
+  );
+
+  const handleConnect = async (id: string) => {
+    if (id === "gcal") {
+      setIsGoogleConnecting(true);
+
+      try {
+        await connectGoogleCalendar();
+      } catch (error) {
+        console.error(error);
+        toast({
+          title: "Google Calendar connect failed",
+          description: "Check Supabase Google provider config and allowed redirect URLs.",
+          variant: "destructive",
+        });
+        setIsGoogleConnecting(false);
+      }
+
+      return;
+    }
+
     toast({ title: 'Connected', description: 'Integration connected successfully.' });
   };
 
-  const handleDisconnect = (id: string) => {
+  const handleDisconnect = async (id: string) => {
+    if (id === "gcal") {
+      try {
+        await disconnectGoogleCalendar(user?.id);
+        setGoogleConnected(false);
+        toast({ title: "Google Calendar disconnected", description: "Calendar sync has been turned off." });
+      } catch (error) {
+        console.error(error);
+        toast({
+          title: "Disconnect failed",
+          description: "We could not remove the Google Calendar connection.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
     const prev = integrations.find(i => i.id === id);
-    setIntegrations(p => p.map(i => i.id === id ? { ...i, connected: false, account: undefined } : i));
     toast({
       title: `${prev?.name} disconnected`,
       description: 'Undo within 4 seconds',
-      action: <Button variant="outline" size="sm" className="text-[12px]" onClick={() => setIntegrations(p => p.map(i => i.id === id ? { ...prev!, connected: true } : i))}>Undo</Button>,
+      action: <Button variant="outline" size="sm" className="text-[12px]">Undo</Button>,
     });
   };
 
@@ -99,9 +188,21 @@ export const SettingsIntegrations = () => {
                 <p className="text-[14px] font-medium">{int.name}</p>
                 <p className="text-[12px] text-muted">{int.description}</p>
               </div>
-              <Button variant="outline" size="icon" className="h-10 w-10 rounded-[10px]" onClick={() => handleConnect(int.id)} title="Connect">
-                <Plus className="h-4 w-4" />
-              </Button>
+              {int.id === "gcal" ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-10 rounded-[10px] px-4"
+                  onClick={() => void handleConnect(int.id)}
+                  disabled={isGoogleConnecting || isGoogleLoading}
+                >
+                  {isGoogleConnecting ? "Connecting..." : "Connect"}
+                </Button>
+              ) : (
+                <Button variant="outline" size="icon" className="h-10 w-10 rounded-[10px]" onClick={() => void handleConnect(int.id)} title="Connect">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           ))}
         </div>

@@ -22,6 +22,7 @@ import RoleRouteSync from "@/components/layout/RoleRouteSync";
 import Login from "@/pages/Login";
 import { ProfileCompletionRoute, ProtectedRoute, PublicOnlyRoute } from "@/components/auth/RouteGuards";
 import CompleteProfile from "@/pages/CompleteProfile";
+import GoogleCalendarCallback from "@/pages/GoogleCalendarCallback";
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,7 @@ const App = () => (
         <AuthProvider>
           <ScrollToTop />
           <Routes>
+            <Route path="/auth/callback/google" element={<GoogleCalendarCallback />} />
             <Route
               path="/login"
               element={
