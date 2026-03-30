@@ -17,6 +17,13 @@ const Dashboard = () => {
   const [editEntry, setEditEntry] = useState<TimeEntry | null>(null);
 
   const today = new Date();
+  const currentHour = today.getHours();
+  const greeting =
+    currentHour < 12
+      ? 'Good morning'
+      : currentHour < 17
+        ? 'Good afternoon'
+        : 'Good evening';
 
   const handleAddEntry = () => {
     setEditEntry(null);
@@ -46,8 +53,8 @@ const Dashboard = () => {
       {/* Header */}
       <div className="flex items-start justify-between mb-10">
         <div>
-          <h1 className="font-medium text-[36px] text-foreground tracking-tight leading-tight">Good afternoon, {currentUser.name.split(' ')[0]}
-
+          <h1 className="font-medium text-[36px] text-foreground tracking-tight leading-tight">
+            {greeting}, {currentUser.name.split(' ')[0]}
           </h1>
         </div>
         <div className="flex items-center gap-3">
