@@ -61,11 +61,7 @@ const GoogleCalendarCallback = () => {
       } catch (error) {
         console.error(error);
         if (active) {
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "We could not finish the Google Calendar connection."
-          );
+          setErrorMessage(error instanceof Error ? error.message : JSON.stringify(error));
         }
       }
     };
