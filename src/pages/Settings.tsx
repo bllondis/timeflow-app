@@ -8,7 +8,6 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { X, Plus, Settings as SettingsIcon, Unplug } from 'lucide-react';
 import {
-  completeGoogleCalendarOAuth,
   connectGoogleCalendar,
   disconnectGoogleCalendar,
   getGoogleCalendarIntegration,
@@ -72,30 +71,6 @@ export const SettingsIntegrations = () => {
       }
 
       try {
-        const url = new URL(window.location.href);
-        const hasOAuthParams =
-          url.searchParams.has("code") ||
-          url.searchParams.has("state") ||
-          url.searchParams.has("error");
-
-        if (hasOAuthParams) {
-          const oauthError = url.searchParams.get("error_description") || url.searchParams.get("error");
-
-          if (oauthError) {
-            throw new Error(oauthError);
-          }
-
-          await completeGoogleCalendarOAuth();
-
-          if (active) {
-            window.history.replaceState({}, document.title, "/settings/integrations");
-            toast({
-              title: "Google Calendar connected",
-              description: "Your calendar is now connected in read-only mode.",
-            });
-          }
-        }
-
         const integration = await getGoogleCalendarIntegration(user.id);
         if (active) {
           setGoogleConnected(Boolean(integration?.connected));

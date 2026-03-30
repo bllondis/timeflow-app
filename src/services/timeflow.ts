@@ -26,7 +26,7 @@ import type {
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const PROFILE_STORAGE_KEY = "timeflow-profile";
 const GOOGLE_CALENDAR_PROVIDER = "google";
-const GOOGLE_CALENDAR_REDIRECT_URI = "https://timeflow-assistant-main.vercel.app/settings/integrations";
+const GOOGLE_CALENDAR_REDIRECT_URI = "https://timeflow-assistant-main.vercel.app/auth/callback/google";
 
 const getProfileStorageKey = (authUserId?: string | null) =>
   authUserId ? `${PROFILE_STORAGE_KEY}:${authUserId}` : PROFILE_STORAGE_KEY;
@@ -144,7 +144,7 @@ const getGoogleCalendarRedirectUrl = () => {
   }
 
   return window.location.hostname === "localhost"
-    ? `${window.location.origin}/settings/integrations`
+    ? `${window.location.origin}/auth/callback/google`
     : GOOGLE_CALENDAR_REDIRECT_URI;
 };
 
