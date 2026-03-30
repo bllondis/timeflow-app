@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { completeGoogleCalendarOAuth } from "@/services/timeflow";
+import { supabase } from "@/lib/supabase";
+import { saveGoogleCalendarTokens } from "@/services/timeflow";
 
 const GoogleCalendarCallback = () => {
   const navigate = useNavigate();
@@ -11,7 +12,49 @@ const GoogleCalendarCallback = () => {
 
     const run = async () => {
       try {
-        await completeGoogleCalendarOAuth();
+        if (!supabase) {
+          throw new Error("Supabase is not configured");
+        }
+
+        const hash = window.location.hash.startsWith("#")
+          ? new URLSearchParams(window.location.hash.slice(1))
+          : new URLSearchParams();
+
+        const hasOAuthTokens =
+          hash.has("access_token") ||
+          hash.has("refresh_token") ||
+          hash.has("provider_token") ||
+          hash.has("provider_refresh_token");
+
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error) {
+          throw error;
+        }
+
+        if (!session?.user) {
+          if (hasOAuthTokens) {
+            throw new Error("We could not read the Google Calendar session from the callback.");
+          }
+
+          navigate("/settings/integrations", { replace: true });
+          return;
+        }
+
+        if (session.provider_token) {
+          await saveGoogleCalendarTokens({
+            authUserId: session.user.id,
+            accessToken: session.provider_token,
+            refreshToken: session.provider_refresh_token,
+            expiresAt: session.expires_at
+              ? new Date(session.expires_at * 1000).toISOString()
+              : null,
+          });
+        }
+
         if (active) {
           navigate("/settings/integrations", { replace: true });
         }
