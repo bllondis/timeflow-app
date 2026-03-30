@@ -3,7 +3,6 @@ import { NavLink } from '@/components/NavLink';
 import { useAppContext } from '@/contexts/AppContext';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Clock, CalendarDays, FileText, Settings as SettingsIcon, Users, BarChart3, AlertTriangle, Plug, Shield, User, Bell, Sparkles, ChevronDown, LogOut } from 'lucide-react';
-import userAvatar from '@/assets/user-avatar.jpg';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useState } from 'react';
 
@@ -70,7 +69,17 @@ const SidebarNav = () => {
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverTrigger asChild>
           <button className="w-full px-4 py-3 flex items-center gap-3 hover:bg-secondary/50 transition-colors duration-120 cursor-pointer border-b border-border/60 text-left">
-            <img src={userAvatar} alt={currentUser.name} className="h-[30px] w-[30px] rounded-full object-cover flex-shrink-0" />
+            {currentUser.avatarUrl ? (
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser.name}
+                className="h-[30px] w-[30px] rounded-full object-cover flex-shrink-0"
+              />
+            ) : (
+              <div className="h-[30px] w-[30px] rounded-full bg-secondary text-[12px] font-semibold text-foreground flex items-center justify-center flex-shrink-0">
+                {currentUser.initials}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-semibold leading-tight text-foreground">{currentUser.name}</p>
               <div className="flex items-center gap-1.5 mt-0.5">

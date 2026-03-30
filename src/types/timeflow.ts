@@ -4,6 +4,7 @@ export interface CurrentUser {
   email: string;
   location: string;
   initials: string;
+  avatarUrl?: string;
 }
 
 export interface TimeEntry {

@@ -28,6 +28,8 @@ const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const PROFILE_STORAGE_KEY = "timeflow-profile";
 const GOOGLE_CALENDAR_PROVIDER = "google";
 const GOOGLE_CALENDAR_REDIRECT_URI = "https://timeflow-assistant-main.vercel.app/auth/callback/google";
+const DEADLINE_TIME_LABEL = "17:00";
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 const getProfileStorageKey = (authUserId?: string | null) =>
   authUserId ? `${PROFILE_STORAGE_KEY}:${authUserId}` : PROFILE_STORAGE_KEY;
@@ -56,6 +58,7 @@ const mapCurrentUser = (row: any): CurrentUser => ({
   email: row.email,
   location: row.location,
   initials: row.initials,
+  avatarUrl: row.avatar_url ?? row.avatarUrl ?? undefined,
 });
 
 const buildInitials = (name: string, fallback = mockCurrentUser.initials) => {
@@ -86,6 +89,53 @@ const getNameFromAuthUser = (user: User) => {
   }
 
   return mockCurrentUser.name;
+};
+
+const getAvatarUrlFromAuthUser = (user?: User | null) =>
+  typeof user?.user_metadata?.avatar_url === "string" && user.user_metadata.avatar_url.trim().length > 0
+    ? user.user_metadata.avatar_url
+    : undefined;
+
+const getCurrentWeekFriday = (currentDate = new Date()) => {
+  const today = new Date(currentDate);
+  today.setHours(0, 0, 0, 0);
+
+  const mondayOffset = (today.getDay() + 6) % 7;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - mondayOffset);
+
+  const friday = new Date(monday);
+  friday.setDate(monday.getDate() + 4);
+  friday.setHours(0, 0, 0, 0);
+
+  return friday;
+};
+
+const formatDeadlineDate = (targetDate: Date) => {
+  const formattedDate = targetDate.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+
+  return `${formattedDate} · ${DEADLINE_TIME_LABEL}`;
+};
+
+const getDaysLeftUntil = (targetDate: Date, currentDate = new Date()) => {
+  const today = new Date(currentDate);
+  today.setHours(0, 0, 0, 0);
+
+  return Math.max(0, Math.ceil((targetDate.getTime() - today.getTime()) / DAY_IN_MS));
+};
+
+const withDynamicDeadline = (deadline: Deadline): Deadline => {
+  const friday = getCurrentWeekFriday();
+
+  return {
+    ...deadline,
+    date: formatDeadlineDate(friday),
+    daysLeft: getDaysLeftUntil(friday),
+  };
 };
 
 const getStoredCurrentUser = (authUserId?: string | null): CurrentUser | null => {
@@ -236,12 +286,14 @@ export const getCurrentUser = async (): Promise<CurrentUser> =>
 
 export const ensureCurrentUserProfile = async (authUser: User): Promise<CurrentUser> => {
   const derivedName = getNameFromAuthUser(authUser);
+  const avatarUrl = getAvatarUrlFromAuthUser(authUser);
   const seededProfile: CurrentUser = {
     name: derivedName,
     role: "",
     email: authUser.email ?? mockCurrentUser.email,
     location: "",
     initials: buildInitials(derivedName),
+    avatarUrl,
   };
 
   if (!hasSupabaseConfig || !supabase) {
@@ -260,7 +312,11 @@ export const ensureCurrentUserProfile = async (authUser: User): Promise<CurrentU
   }
 
   if (existingProfile) {
-    const nextProfile = mapCurrentUser(existingProfile);
+    const mappedProfile = mapCurrentUser(existingProfile);
+    const nextProfile = {
+      ...mappedProfile,
+      avatarUrl: avatarUrl ?? mappedProfile.avatarUrl,
+    };
     persistCurrentUser(nextProfile, authUser.id);
     return nextProfile;
   }
@@ -282,7 +338,10 @@ export const ensureCurrentUserProfile = async (authUser: User): Promise<CurrentU
     throw error;
   }
 
-  const nextProfile = mapCurrentUser(data);
+  const nextProfile = {
+    ...mapCurrentUser(data),
+    avatarUrl,
+  };
   persistCurrentUser(nextProfile, authUser.id);
   return nextProfile;
 };
@@ -340,7 +399,10 @@ export const updateCurrentUser = async (
     .single();
 
   if (error) throw error;
-  const savedUser = mapCurrentUser(data);
+  const savedUser = {
+    ...mapCurrentUser(data),
+    avatarUrl: nextUser.avatarUrl,
+  };
   persistCurrentUser(savedUser, authUserId);
   return savedUser;
 };
@@ -543,6 +605,16 @@ export const getCurrentUserByAuth = async (authUserId?: string | null): Promise<
       return mockCurrentUser;
     }
 
+    let authAvatarUrl: string | undefined;
+    try {
+      const { data: authData } = await supabase!.auth.getUser();
+      if (authData.user?.id === authUserId) {
+        authAvatarUrl = getAvatarUrlFromAuthUser(authData.user);
+      }
+    } catch (error) {
+      console.warn("Failed to resolve auth user avatar.", error);
+    }
+
     const { data, error } = await supabase!
       .from("profiles")
       .select("name, role, email, location, initials")
@@ -551,7 +623,17 @@ export const getCurrentUserByAuth = async (authUserId?: string | null): Promise<
 
     if (error) throw error;
 
-    const user = data ? mapCurrentUser(data) : getStoredCurrentUser(authUserId) ?? mockCurrentUser;
+    const fallbackUser = getStoredCurrentUser(authUserId) ?? mockCurrentUser;
+    const mappedUser = data ? mapCurrentUser(data) : null;
+    const user = mappedUser
+      ? {
+          ...mappedUser,
+          avatarUrl: authAvatarUrl ?? mappedUser.avatarUrl,
+        }
+      : {
+          ...fallbackUser,
+          avatarUrl: authAvatarUrl ?? fallbackUser.avatarUrl,
+        };
     persistCurrentUser(user, authUserId);
     return user;
   }, getStoredCurrentUser(authUserId) ?? mockCurrentUser);
@@ -625,13 +707,13 @@ export const getDeadline = async (): Promise<Deadline> =>
 
     if (error) throw error;
 
-    return {
+    return withDynamicDeadline({
       date: data.date_label,
       daysLeft: Number(data.days_left),
       weekLabel: data.week_label ?? "Week 10",
       lateCount: Number(data.late_count ?? 0),
-    };
-  }, mockDeadline);
+    });
+  }, withDynamicDeadline(mockDeadline));
 
 export const getCatchupDays = async (): Promise<CatchupDay[]> =>
   withFallback(async () => {
