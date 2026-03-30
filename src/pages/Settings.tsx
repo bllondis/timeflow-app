@@ -51,6 +51,23 @@ const defaultCollectionToggles: CollectionToggle[] = [
   { id: 'app-activity', label: 'App activity (macOS)', description: 'Which app is in focus and for how long', enabled: false },
 ];
 
+const GOOGLE_CALENDAR_LOGO_URL =
+  'https://ssl.gstatic.com/calendar/images/dynamiclogo_2020q4/calendar_31_2x.png';
+
+const IntegrationIcon = ({ integration }: { integration: Integration }) => {
+  if (integration.id === 'gcal') {
+    return (
+      <img
+        src={GOOGLE_CALENDAR_LOGO_URL}
+        alt="Google Calendar"
+        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+      />
+    );
+  }
+
+  return <>{integration.icon}</>;
+};
+
 export const SettingsIntegrations = () => {
   const { user } = useAuthContext();
   const [googleConnected, setGoogleConnected] = useState(false);
@@ -192,7 +209,9 @@ export const SettingsIntegrations = () => {
         <div className="space-y-3">
           {available.map(int => (
             <div key={int.id} className="border border-border bg-card rounded-lg p-6 flex items-center gap-4 shadow-card">
-              <div className={`w-9 h-9 rounded-[10px] ${int.iconBg} flex items-center justify-center text-primary-foreground text-[10px] shrink-0 font-medium`}>{int.icon}</div>
+              <div className={`w-9 h-9 rounded-[10px] ${int.iconBg} flex items-center justify-center text-primary-foreground text-[10px] shrink-0 font-medium overflow-hidden`}>
+                <IntegrationIcon integration={int} />
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[14px] font-medium">{int.name}</p>
                 <p className="text-[12px] text-muted">{int.description}</p>
@@ -222,7 +241,9 @@ export const SettingsIntegrations = () => {
 
 const IntegrationCard = ({ integration: int, onDisconnect }: { integration: Integration; onDisconnect: (id: string) => void }) => (
   <div className="border border-[hsl(205_85%_88%)] bg-[hsl(202_100%_98%)] rounded-lg p-6 flex items-start gap-4">
-    <div className={`w-9 h-9 rounded-[10px] ${int.iconBg} flex items-center justify-center text-primary-foreground text-[10px] shrink-0 font-medium mt-0.5`}>{int.icon}</div>
+    <div className={`w-9 h-9 rounded-[10px] ${int.iconBg} flex items-center justify-center text-primary-foreground text-[10px] shrink-0 font-medium mt-0.5 overflow-hidden`}>
+      <IntegrationIcon integration={int} />
+    </div>
     <div className="flex-1 min-w-0">
       <p className="text-[14px] font-medium">{int.name}</p>
       <p className="text-[12px] text-muted">{int.description}</p>
