@@ -16,6 +16,7 @@ import type {
   CatchupDay,
   CurrentUser,
   Deadline,
+  GoogleCalendarEvent,
   IntegrationConnection,
   TeamMember,
   TimeEntry,
@@ -137,6 +138,76 @@ const mapIntegrationConnection = (row: any): IntegrationConnection => ({
   connected: true,
   expiresAt: row.expires_at ?? null,
 });
+
+const getTodayCalendarRange = () => {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+
+  return {
+    timeMin: start.toISOString(),
+    timeMax: end.toISOString(),
+  };
+};
+
+const formatDurationMinutes = (minutes: number) => {
+  const safeMinutes = Math.max(0, minutes);
+  const hours = Math.floor(safeMinutes / 60);
+  const remainingMinutes = safeMinutes % 60;
+  return `${hours}h ${remainingMinutes.toString().padStart(2, "0")}m`;
+};
+
+const formatCalendarTime = (value?: string | null) => {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+};
+
+const mapGoogleCalendarEvent = (event: any): GoogleCalendarEvent => {
+  const start = event.start?.dateTime ?? event.start?.date ?? null;
+  const end = event.end?.dateTime ?? event.end?.date ?? null;
+
+  return {
+    id: String(event.id ?? crypto.randomUUID()),
+    summary: typeof event.summary === "string" && event.summary.trim()
+      ? event.summary.trim()
+      : "Calendar event",
+    start,
+    end,
+  };
+};
+
+export const mapGoogleCalendarEventToEntry = (
+  event: GoogleCalendarEvent,
+  index: number
+): TimeEntry => {
+  const startDate = event.start ? new Date(event.start) : null;
+  const endDate = event.end ? new Date(event.end) : null;
+  const durationMinutes =
+    startDate && endDate && !Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime())
+      ? Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 60000))
+      : 0;
+
+  return {
+    id: -(index + 1),
+    project: "Google Calendar",
+    task: event.summary,
+    timeRange: `${formatCalendarTime(event.start)}-${formatCalendarTime(event.end)}`.replace(/^-|-$/g, ""),
+    duration: formatDurationMinutes(durationMinutes),
+    confidence: "high",
+    source: "Calendar",
+    confirmed: false,
+  };
+};
 
 const getGoogleCalendarRedirectUrl = () => {
   if (typeof window === "undefined") {
@@ -319,6 +390,49 @@ export const connectGoogleCalendar = async () => {
 
   if (error) {
     throw error;
+  }
+};
+
+export const getGoogleCalendarEvents = async (authUserId?: string | null): Promise<GoogleCalendarEvent[]> => {
+  if (!authUserId || !hasSupabaseConfig || !supabase) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("integrations")
+      .select("access_token")
+      .eq("user_id", authUserId)
+      .eq("provider", GOOGLE_CALENDAR_PROVIDER)
+      .maybeSingle();
+
+    if (error || !data?.access_token) {
+      return [];
+    }
+
+    const { timeMin, timeMax } = getTodayCalendarRange();
+    const url = new URL("https://www.googleapis.com/calendar/v3/calendars/primary/events");
+    url.searchParams.set("timeMin", timeMin);
+    url.searchParams.set("timeMax", timeMax);
+    url.searchParams.set("singleEvents", "true");
+    url.searchParams.set("orderBy", "startTime");
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${data.access_token}`,
+      },
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const payload = await response.json();
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    return items.map(mapGoogleCalendarEvent);
+  } catch (error) {
+    console.warn("Google Calendar request failed, using empty calendar events.", error);
+    return [];
   }
 };
 

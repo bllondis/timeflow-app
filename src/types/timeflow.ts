@@ -91,3 +91,10 @@ export interface IntegrationConnection {
   connected: boolean;
   expiresAt: string | null;
 }
+
+export interface GoogleCalendarEvent {
+  id: string;
+  summary: string;
+  start: string | null;
+  end: string | null;
+}

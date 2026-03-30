@@ -9,9 +9,11 @@ import {
 import {
   getCurrentUserByAuth,
   getDeadline,
+  getGoogleCalendarEvents,
   getNotifications,
   getProjects,
   getTimeEntries,
+  mapGoogleCalendarEventToEntry,
   markAllNotificationsAsRead,
   markNotificationAsRead,
   updateCurrentUser,
@@ -91,12 +93,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           getNotifications(),
         ]);
 
+        const calendarEvents = await getGoogleCalendarEvents(user?.id);
+        const calendarEntries = calendarEvents.map(mapGoogleCalendarEventToEntry);
+
         if (!active) return;
 
         setCurrentUser(latestUser);
         setDeadline(due);
         setProjects(projectOptions);
-        setEntries(latestEntries);
+        setEntries([...latestEntries, ...calendarEntries]);
         setNotifications(latestNotifications);
       } catch (error) {
         console.error("Failed to hydrate app context.", error);
