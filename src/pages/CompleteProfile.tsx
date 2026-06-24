@@ -105,7 +105,7 @@ const CompleteProfile = () => {
                   value={role}
                   onChange={(event) => setRole(event.target.value)}
                   className="mt-2 h-14 rounded-[16px] px-5 text-[15px]"
-                  placeholder="UX Designer"
+                  placeholder=""
                 />
               </div>
 
@@ -115,7 +115,7 @@ const CompleteProfile = () => {
                   value={location}
                   onChange={(event) => setLocation(event.target.value)}
                   className="mt-2 h-14 rounded-[16px] px-5 text-[15px]"
-                  placeholder="Amsterdam"
+                  placeholder=""
                 />
               </div>
             </div>
