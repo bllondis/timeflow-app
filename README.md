@@ -1,86 +1,77 @@
-# Welcome to your Lovable project
+# Timeflow – don't log time, review it
 
-## Project info
+An AI timesheet assistant that reconstructs your workday from digital signals, so instead of filling in hours by hand you confirm a suggested timesheet in about ten seconds.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+**[Case study](https://bllondis.github.io/portfolio-site/cases/timeflow.html)** · **[Live app](https://timeflow-assistant-main.vercel.app/)** · React · TypeScript · Supabase · Vercel
 
-## How can I edit this code?
+<!-- TODO: add a screenshot of the dashboard here -->
 
-There are several ways of editing your application.
+> Solo project: research, product strategy, design system, UI and a deployed full-stack app.
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## The problem
 
-Changes made via Lovable will be committed automatically to this repo.
+Logging time is a chore people postpone until Friday, then reconstruct from memory. The result is late, inaccurate timesheets and frustrated managers.
 
-**Use your preferred IDE**
+**Core reframe:** the user shouldn't *log* time, they should *review* it. Timeflow gathers signals from tools people already use (starting with Google Calendar), drafts the entries, and asks the user only to confirm or adjust.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## What's in the app
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Dashboard** – today's suggested entries, weekly stats, deadlines and a review prompt
+- **Google Calendar integration** – real OAuth 2.0 flow; calendar events appear on the dashboard as suggested entries with their source shown
+- **Review and week view** – confirm, edit or add entries before submitting the week
+- **Manager view and approvals** – team overview and timesheet approval flow
+- **Insights and reports** – where time went, built with Recharts
+- **Source and confidence transparency** – every suggested entry shows where it came from, so people can trust the automation instead of second-guessing it
 
-Follow these steps:
+## Design decisions
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+- **Trust vs automation.** Auto-filled time feels risky to users. The answer was transparency: each entry carries its source and an accuracy indicator, and nothing is submitted without the user's confirmation.
+- **Restrained colour.** A colour-overload audit of the manager view led to strict rules: teal for time values only, orange limited to three places in the whole product.
+- **Accessible by default.** Calm parchment background, Urbanist typeface, all text contrast checked against WCAG AA.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## Tech
 
-# Step 3: Install the necessary dependencies.
-npm i
+- **React + TypeScript + Vite**, React Router, TanStack Query
+- **Tailwind CSS + shadcn/ui**
+- **Supabase** – Postgres, auth (Google provider with `calendar.readonly` scope), data for entries, projects, approvals and notifications
+- **Google Calendar API**
+- **Recharts** for insights
+- **Vercel** – auto-deploys on every push to `main`
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```
+src/
+  pages/        Dashboard, Review, WeekView, Timesheets, ManagerView, Approvals, Insights, Reports, Settings
+  components/   dashboard widgets, layout, auth route guards, AI accuracy indicator
+  services/     Supabase and Google Calendar data layer
+  contexts/     auth and app state
+supabase/       schema, seed data and Google Calendar integration tables
+```
+
+## One bug worth mentioning
+
+The first Google OAuth flow ended in a chain of 404s. The cause wasn't routing at all: a missing `UNIQUE` constraint on the integrations table made the token upsert fail silently. Adding `unique (user_id, provider)` fixed it. It's a good reminder that "the redirect is broken" can be a database problem.
+
+## How it was built
+
+Research with Perplexity and ChatGPT, wireframes in Banani, hi-fi screens in Figma Make, scaffolding in Lovable, then code with Codex and Antigravity. I made the product and design decisions, defined the design system, and reviewed and shipped what the AI tools produced.
+
+## Run locally
+
+```bash
+npm install
+cp .env.example .env   # add your Supabase URL and anon key
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+To set up the database, run `supabase/schema.sql`, then `supabase/google_calendar_oauth.sql` and optionally `supabase/seed.sql` in the Supabase SQL editor.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Next
 
-**Use GitHub Codespaces**
+- Claude API to group raw signals by project and suggest durations
+- More signal sources beyond Google Calendar
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+---
 
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-- Supabase (optional live data source with mock fallback)
-
-## Supabase setup
-
-The app now supports a live Supabase backend and automatically falls back to local mock data when env vars or tables are missing.
-
-1. Copy `.env.example` to `.env`.
-2. Fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-3. Create the tables from `supabase/schema.sql`.
-4. Run `supabase/seed.sql` in the Supabase SQL Editor to load demo data automatically.
-5. Replace the seeded rows with your real data later, or keep using the same table shapes from `src/data/mockData.ts`.
-
-Data access lives in `src/services/timeflow.ts`, so future API or schema changes should go there rather than inside page components.
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Designed and built by [Tetiana Dovgalenko](https://bllondis.github.io/portfolio-site/) – Product Designer & AI Design Engineer, The Hague.
