@@ -1,18 +1,31 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase";
+import { DEMO_USER_ID, isDemoModeActive, setDemoModeActive } from "@/lib/demoMode";
 import { ensureCurrentUserProfile } from "@/services/timeflow";
+
+type AuthUser = Pick<User, "id" | "email" | "user_metadata">;
 
 interface AuthContextValue {
   session: Session | null;
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
+  isDemoMode: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithMagicLink: (email: string) => Promise<void>;
+  signInDemo: () => void;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+const demoUser: AuthUser = {
+  id: DEMO_USER_ID,
+  email: "freja@company.com",
+  user_metadata: {
+    full_name: "Freja Lindström",
+  },
+};
 
 const getRedirectUrl = () => {
   if (typeof window === "undefined") {
@@ -24,9 +37,15 @@ const getRedirectUrl = () => {
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(hasSupabaseConfig);
+  const [isDemoMode, setIsDemoMode] = useState(isDemoModeActive);
+  const [loading, setLoading] = useState(() => hasSupabaseConfig && !isDemoModeActive());
 
   useEffect(() => {
+    if (isDemoModeActive()) {
+      setLoading(false);
+      return;
+    }
+
     if (!supabase) {
       setLoading(false);
       return;
@@ -72,6 +91,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw new Error("Supabase is not configured");
     }
 
+    setDemoModeActive(false);
+    setIsDemoMode(false);
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -89,6 +111,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw new Error("Supabase is not configured");
     }
 
+    setDemoModeActive(false);
+    setIsDemoMode(false);
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
@@ -101,7 +126,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const signInDemo = () => {
+    setSession(null);
+    setDemoModeActive(true);
+    setIsDemoMode(true);
+    setLoading(false);
+  };
+
   const signOut = async () => {
+    if (isDemoMode) {
+      setDemoModeActive(false);
+      setIsDemoMode(false);
+      setSession(null);
+      return;
+    }
+
     if (!supabase) {
       return;
     }
@@ -116,10 +155,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     <AuthContext.Provider
       value={{
         session,
-        user: session?.user ?? null,
+        user: isDemoMode ? demoUser : session?.user ?? null,
         loading,
+        isDemoMode,
         signInWithGoogle,
         signInWithMagicLink,
+        signInDemo,
         signOut,
       }}
     >

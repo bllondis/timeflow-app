@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Mail } from "lucide-react";
+import { Mail, MonitorPlay } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -10,7 +10,7 @@ import googleGIcon from "@/assets/google-g.svg";
 
 const Login = () => {
   const { toast } = useToast();
-  const { signInWithGoogle, signInWithMagicLink } = useAuthContext();
+  const { signInWithGoogle, signInWithMagicLink, signInDemo } = useAuthContext();
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState<"google" | "email" | null>(null);
 
@@ -129,7 +129,7 @@ const Login = () => {
             <div className="mb-10">
               <h2 className="text-[58px] font-medium leading-[0.98] tracking-tight text-foreground lg:text-[56px]">Sign in</h2>
               <p className="mt-4 max-w-[42ch] text-[18px] leading-[1.55] text-muted">
-                Use Google for the smoothest setup, or send yourself a magic link if you just want a quick test login.
+                Sign in to connect your workspace, or explore Timeflow instantly with sample data in demo mode.
               </p>
             </div>
 
@@ -177,12 +177,33 @@ const Login = () => {
                   <Mail className="mr-2 h-4 w-4" />
                   {submitting === "email" ? "Sending..." : "Send magic link"}
                 </Button>
+
+                <div className="flex items-center gap-4 py-2">
+                  <div className="h-px flex-1 bg-border/80" />
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-muted">or</span>
+                  <div className="h-px flex-1 bg-border/80" />
+                </div>
+
+                <div>
+                  <Button
+                    variant="secondary"
+                    className="h-16 w-full rounded-[18px] text-[15px] font-medium"
+                    onClick={signInDemo}
+                    disabled={submitting !== null}
+                  >
+                    <MonitorPlay className="mr-2 h-5 w-5 text-primary" />
+                    Continue in demo mode
+                  </Button>
+                  <p className="mt-3 text-center text-[12px] leading-5 text-muted">
+                    No account needed · uses sample data only
+                  </p>
+                </div>
               </div>
             </div>
 
             <div className="mt-10 border-t border-border/80 pt-8">
               <p className="text-[13px] leading-7 text-muted">
-              After sign in, we create a starter profile for you automatically. You can refine it later in{" "}
+              Signed-in users get a starter profile automatically. You can refine it later in{" "}
               <Link to="/settings/profile" className="text-primary underline-offset-4 hover:underline">
                 Profile settings
               </Link>

@@ -8,7 +8,7 @@ import { useState } from 'react';
 
 const SidebarNav = () => {
   const { role, setRole, dayStatus, unreadCount, currentUser, deadline, entries } = useAppContext();
-  const { signOut } = useAuthContext();
+  const { signOut, isDemoMode } = useAuthContext();
   const location = useLocation();
   const navigate = useNavigate();
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -93,7 +93,14 @@ const SidebarNav = () => {
         <PopoverContent align="start" side="bottom" className="w-[220px] p-0 rounded-[10px] shadow-modal" sideOffset={4}>
           {/* Header */}
           <div className="px-3.5 py-2.5 border-b border-border/40">
-            <p className="text-[13px] font-semibold text-foreground">{currentUser.name}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[13px] font-semibold text-foreground">{currentUser.name}</p>
+              {isDemoMode && (
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-mono font-medium uppercase tracking-wide text-primary">
+                  Demo mode
+                </span>
+              )}
+            </div>
             <p className="text-[10px] font-mono text-muted">{currentUser.email}</p>
           </div>
           {/* Role options */}

@@ -35,8 +35,8 @@ interface CollectionToggle {
 
 const defaultIntegrations: Integration[] = [
   { id: 'gcal', name: 'Google Calendar', icon: 'Cal', iconBg: 'bg-[hsl(217_89%_51%)]', description: 'Event titles · duration · attendees count', connected: false, badges: [{ label: 'Event titles', allowed: true }, { label: 'Duration', allowed: true }, { label: 'Event content', allowed: false }, { label: 'Attendee names', allowed: false }] },
-  { id: 'figma', name: 'Figma', icon: 'Fig', iconBg: 'bg-[hsl(0_0%_12%)]', description: 'Active files · session duration · project names', connected: true, account: '@olena_kovalenko', badges: [{ label: 'File names', allowed: true }, { label: 'Session time', allowed: true }, { label: 'File content', allowed: false }, { label: 'Screenshots', allowed: false }] },
-  { id: 'jira', name: 'Jira', icon: 'Jira', iconBg: 'bg-[hsl(214_100%_40%)]', description: 'Tickets viewed · comments added · status changes', connected: true, account: 'olena@company.com', badges: [{ label: 'Ticket IDs', allowed: true }, { label: 'Time on ticket', allowed: true }, { label: 'Ticket content', allowed: false }, { label: 'Comments text', allowed: false }] },
+  { id: 'figma', name: 'Figma', icon: 'Fig', iconBg: 'bg-[hsl(0_0%_12%)]', description: 'Active files · session duration · project names', connected: true, account: '@freja_lindstrom', badges: [{ label: 'File names', allowed: true }, { label: 'Session time', allowed: true }, { label: 'File content', allowed: false }, { label: 'Screenshots', allowed: false }] },
+  { id: 'jira', name: 'Jira', icon: 'Jira', iconBg: 'bg-[hsl(214_100%_40%)]', description: 'Tickets viewed · comments added · status changes', connected: true, account: 'freja@company.com', badges: [{ label: 'Ticket IDs', allowed: true }, { label: 'Time on ticket', allowed: true }, { label: 'Ticket content', allowed: false }, { label: 'Comments text', allowed: false }] },
   { id: 'github', name: 'GitHub', icon: 'GH', iconBg: 'bg-[hsl(210_12%_16%)]', description: 'Commits · PRs · code review activity', connected: false },
   { id: 'teams', name: 'Microsoft Teams', icon: 'MS', iconBg: 'bg-[hsl(248_53%_53%)]', description: 'Meetings · call duration · channel activity', connected: false },
   { id: 'slack', name: 'Slack', icon: 'Slk', iconBg: 'bg-[hsl(315_100%_15%)]', description: 'Active hours · channel context', connected: false },
@@ -69,7 +69,7 @@ const IntegrationIcon = ({ integration }: { integration: Integration }) => {
 };
 
 export const SettingsIntegrations = () => {
-  const { user } = useAuthContext();
+  const { user, isDemoMode } = useAuthContext();
   const [googleConnected, setGoogleConnected] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(true);
   const [isGoogleConnecting, setIsGoogleConnecting] = useState(false);
@@ -190,6 +190,12 @@ export const SettingsIntegrations = () => {
         <p className="text-[13px] text-muted mt-1">Connect data sources · AI uses only what you allow</p>
       </div>
 
+      {isDemoMode && (
+        <div className="mb-8 rounded-[14px] border border-primary/15 bg-primary/5 px-4 py-3 text-[13px] leading-6 text-muted">
+          Live integrations are paused in demo mode. Sign in with Google or email to connect your own data.
+        </div>
+      )}
+
       <div className="mb-10">
         <h3 className="font-medium text-[16px] mb-1">Connected sources</h3>
         <p className="text-[13px] text-muted mb-4">Active sources. AI uses signals from these tools</p>
@@ -222,9 +228,9 @@ export const SettingsIntegrations = () => {
                   size="sm"
                   className="h-10 rounded-[10px] px-4"
                   onClick={() => void handleConnect(int.id)}
-                  disabled={isGoogleConnecting || isGoogleLoading}
+                  disabled={isDemoMode || isGoogleConnecting || isGoogleLoading}
                 >
-                  {isGoogleConnecting ? "Connecting..." : "Connect"}
+                  {isDemoMode ? "Sign in to connect" : isGoogleConnecting ? "Connecting..." : "Connect"}
                 </Button>
               ) : (
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-[10px]" onClick={() => void handleConnect(int.id)} title="Connect">

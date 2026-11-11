@@ -10,11 +10,11 @@ import type {
 } from "@/types/timeflow";
 
 export const currentUser: CurrentUser = {
-  name: "Tetiana Dovgalenko",
+  name: "Freja Lindström",
   role: "UX Designer",
-  email: "olena@company.com",
-  location: "Lviv",
-  initials: "OL",
+  email: "freja@company.com",
+  location: "Stockholm",
+  initials: "FL",
 };
 
 export const projects: string[] = [
@@ -39,7 +39,7 @@ export const weekData: WeekData = {
 };
 
 export const teamMembers: TeamMember[] = [
-  { name: "Olena Kovalenko", initials: "OL", days: [8, 7.5, 8, 0, 0] },
+  { name: "Freja Lindström", initials: "FL", days: [8, 7.5, 8, 0, 0] },
   { name: "Mykola Shevchenko", initials: "MY", days: [4, 8, 0, 0, 0] },
   { name: "Taras Bondarenko", initials: "TB", days: [8, 8, 7, 0, 0] },
   { name: "Anna Petrenko", initials: "AP", days: [7.5, 0, 0, 0, 0] },
@@ -138,7 +138,7 @@ export const initialNotifications: AppNotification[] = [
 ];
 
 export const initialApprovals: TimesheetApproval[] = [
-  { id: 1, name: 'Olena Kovalenko', initials: 'OL', week: 'Week 9 (Mar 3–7)', totalHours: 38.5, entries: 18, submittedAt: 'Fri 7 Mar, 16:42', status: 'pending' },
+  { id: 1, name: 'Freja Lindström', initials: 'FL', week: 'Week 9 (Mar 3–7)', totalHours: 38.5, entries: 18, submittedAt: 'Fri 7 Mar, 16:42', status: 'pending' },
   { id: 2, name: 'Taras Bondarenko', initials: 'TB', week: 'Week 9 (Mar 3–7)', totalHours: 41, entries: 22, submittedAt: 'Fri 7 Mar, 17:10', status: 'pending' },
   { id: 3, name: 'Ihor Kovalenko', initials: 'IK', week: 'Week 9 (Mar 3–7)', totalHours: 39, entries: 19, submittedAt: 'Fri 7 Mar, 15:30', status: 'pending' },
 ];

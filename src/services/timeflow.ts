@@ -10,6 +10,7 @@ import {
   initialApprovals as mockApprovals,
 } from "@/data/mockData";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase";
+import { isDemoModeActive } from "@/lib/demoMode";
 import type { User } from "@supabase/supabase-js";
 import type {
   AppNotification,
@@ -40,7 +41,7 @@ const withFallback = async <T,>(
   loader: () => Promise<T>,
   fallback: T
 ): Promise<T> => {
-  if (!hasSupabaseConfig || !supabase) {
+  if (isDemoModeActive() || !hasSupabaseConfig || !supabase) {
     return useFallback(fallback);
   }
 
@@ -296,7 +297,7 @@ export const ensureCurrentUserProfile = async (authUser: User): Promise<CurrentU
     avatarUrl,
   };
 
-  if (!hasSupabaseConfig || !supabase) {
+  if (isDemoModeActive() || !hasSupabaseConfig || !supabase) {
     persistCurrentUser(seededProfile, authUser.id);
     return seededProfile;
   }
@@ -355,7 +356,7 @@ export const updateCurrentUser = async (
     ...updates,
   };
 
-  if (!hasSupabaseConfig || !supabase) {
+  if (isDemoModeActive() || !hasSupabaseConfig || !supabase) {
     persistCurrentUser(nextUser, authUserId);
     return nextUser;
   }
@@ -433,6 +434,10 @@ export const getGoogleCalendarIntegration = async (
   }, null);
 
 export const connectGoogleCalendar = async () => {
+  if (isDemoModeActive()) {
+    throw new Error("Sign in to connect Google Calendar.");
+  }
+
   if (!supabase) {
     throw new Error("Supabase is not configured");
   }
@@ -456,7 +461,7 @@ export const connectGoogleCalendar = async () => {
 };
 
 export const getGoogleCalendarEvents = async (authUserId?: string | null): Promise<GoogleCalendarEvent[]> => {
-  if (!authUserId || !hasSupabaseConfig || !supabase) {
+  if (isDemoModeActive() || !authUserId || !hasSupabaseConfig || !supabase) {
     return [];
   }
 
@@ -499,7 +504,7 @@ export const getGoogleCalendarEvents = async (authUserId?: string | null): Promi
 };
 
 export const disconnectGoogleCalendar = async (authUserId?: string | null) => {
-  if (!authUserId) {
+  if (isDemoModeActive() || !authUserId) {
     return;
   }
 
@@ -524,6 +529,10 @@ export const saveGoogleCalendarTokens = async (params: {
   refreshToken?: string | null;
   expiresAt?: string | null;
 }) => {
+  if (isDemoModeActive()) {
+    throw new Error("Google Calendar is not available in demo mode.");
+  }
+
   if (!hasSupabaseConfig || !supabase) {
     throw new Error("Supabase is not configured");
   }
@@ -549,6 +558,10 @@ export const saveGoogleCalendarTokens = async (params: {
 };
 
 export const completeGoogleCalendarOAuth = async () => {
+  if (isDemoModeActive()) {
+    throw new Error("Google Calendar is not available in demo mode.");
+  }
+
   if (!supabase) {
     throw new Error("Supabase is not configured");
   }
@@ -760,7 +773,7 @@ export const getTimeEntries = async (): Promise<TimeEntry[]> =>
   }, mockEntries);
 
 export const saveTimeEntry = async (entry: Omit<TimeEntry, "id"> & { id?: number }): Promise<TimeEntry> => {
-  if (!hasSupabaseConfig || !supabase) {
+  if (isDemoModeActive() || !hasSupabaseConfig || !supabase) {
     return {
       ...entry,
       id: entry.id ?? Date.now(),
@@ -791,7 +804,7 @@ export const saveTimeEntry = async (entry: Omit<TimeEntry, "id"> & { id?: number
 };
 
 export const deleteTimeEntry = async (id: number): Promise<void> => {
-  if (!hasSupabaseConfig || !supabase) {
+  if (isDemoModeActive() || !hasSupabaseConfig || !supabase) {
     return;
   }
 
@@ -811,7 +824,7 @@ export const getNotifications = async (): Promise<AppNotification[]> =>
   }, mockNotifications);
 
 export const markNotificationAsRead = async (id: number): Promise<void> => {
-  if (!hasSupabaseConfig || !supabase) {
+  if (isDemoModeActive() || !hasSupabaseConfig || !supabase) {
     return;
   }
 
@@ -824,7 +837,7 @@ export const markNotificationAsRead = async (id: number): Promise<void> => {
 };
 
 export const markAllNotificationsAsRead = async (): Promise<void> => {
-  if (!hasSupabaseConfig || !supabase) {
+  if (isDemoModeActive() || !hasSupabaseConfig || !supabase) {
     return;
   }
 
